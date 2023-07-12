@@ -1,0 +1,34 @@
+[general]
+mapversion          = 1.0
+settimerduration    = 2.5
+settimeron          = btback
+deadzone            = 0.2
+
+[joystick01]
+lstick_left_2key    =
+lstick_right_2key   =
+lstick_up_2key      =
+lstick_down_2key    =
+rstick_left_2key    =
+rstick_right_2key   =
+rstick_up_2key      =
+rstick_down_2key    =
+lstick2mouse        = true
+rstick2mouse        = true
+SDL_CONTROLLER_BUTTON_A                 = mouse left
+SDL_CONTROLLER_BUTTON_B                 = key h
+SDL_CONTROLLER_BUTTON_X                 = mouse right
+SDL_CONTROLLER_BUTTON_Y                 = key i
+SDL_CONTROLLER_BUTTON_BACK              = key return
+SDL_CONTROLLER_BUTTON_GUIDE             =
+SDL_CONTROLLER_BUTTON_START             = key escape
+SDL_CONTROLLER_BUTTON_LEFTSTICK         =
+SDL_CONTROLLER_BUTTON_RIGHTSTICK        =
+SDL_CONTROLLER_BUTTON_LEFTSHOULDER      =
+SDL_CONTROLLER_BUTTON_RIGHTSHOULDER     =
+SDL_CONTROLLER_AXIS_TRIGGERLEFT         = mouse right
+SDL_CONTROLLER_AXIS_TRIGGERRIGHT        = mouse left
+SDL_CONTROLLER_BUTTON_DPAD_UP           = key up
+SDL_CONTROLLER_BUTTON_DPAD_DOWN         = key down
+SDL_CONTROLLER_BUTTON_DPAD_LEFT         = key left
+SDL_CONTROLLER_BUTTON_DPAD_RIGHT        = key right
