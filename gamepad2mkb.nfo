@@ -1,3 +1,10 @@
+update v1.1 28/10/2023
+- fixed log creation (missing message)
+- fixed appname made truncation .exe optional
+- fixed checkpath did not set correct path after
+  function exit when path is correct
+- misc fixes to getmp3cover
+
 public release v1.0 12/07/2023
 
 ## gamepad2mkb
@@ -11,7 +18,7 @@ settimeron          = btback
 gamepad2mkb.exe "path to file"
 if no file is specified then defaults to no emulation
 
-or specify a path via confconf.ini
+or specify a path via conf\conf.ini
 [gamepad map]
 ' location mke
 paddefinition = conf<filename>.mke

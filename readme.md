@@ -43,13 +43,13 @@ lstick_left_2key = key a\
 mousemovement can be mapped / unmapped via:\
 lstick2mouse        = true\
 or\
-lstick2mouse        = false\
+lstick2mouse        = false
 
 ## example .mke structure
 [general]\
 mapversion          = 1.0\
 settimerduration    = 2.5\
-settimeron          = btback
+settimeron          = btback\
 deadzone            = 0.4
 
 [joystick01]\
