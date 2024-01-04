@@ -2,7 +2,8 @@
 mapversion          = 1.0
 settimerduration    = 2.5
 settimeron          = btback
-deadzone            = 0.2
+' set deadzone gamepad [0 - 256] default 128
+deadzone            = 128
 
 [joystick01]
 lstick_left_2key    =

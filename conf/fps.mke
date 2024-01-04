@@ -2,7 +2,8 @@
 mapversion          = 1.0
 settimerduration    = 2.5
 settimeron          = btback
-deadzone            = 0.4
+' set deadzone gamepad [0 - 256] default 128
+deadzone            = 128
 
 [joystick01]
 lstick_left_2key    = key a
@@ -19,13 +20,13 @@ SDL_CONTROLLER_BUTTON_A                 = key space
 SDL_CONTROLLER_BUTTON_B                 = key c
 SDL_CONTROLLER_BUTTON_X                 = key f
 SDL_CONTROLLER_BUTTON_Y                 = key r
-SDL_CONTROLLER_BUTTON_BACK              =
-SDL_CONTROLLER_BUTTON_GUIDE             =
+SDL_CONTROLLER_BUTTON_BACK              = key n
+SDL_CONTROLLER_BUTTON_GUIDE             = key f5
 SDL_CONTROLLER_BUTTON_START             = key escape
 SDL_CONTROLLER_BUTTON_LEFTSTICK         =
-SDL_CONTROLLER_BUTTON_RIGHTSTICK        =
-SDL_CONTROLLER_BUTTON_LEFTSHOULDER      =
-SDL_CONTROLLER_BUTTON_RIGHTSHOULDER     =
+SDL_CONTROLLER_BUTTON_RIGHTSTICK        = key e
+SDL_CONTROLLER_BUTTON_LEFTSHOULDER      = key lshift
+SDL_CONTROLLER_BUTTON_RIGHTSHOULDER     = key rctrl
 SDL_CONTROLLER_AXIS_TRIGGERLEFT         = mouse right
 SDL_CONTROLLER_AXIS_TRIGGERRIGHT        = mouse left
 SDL_CONTROLLER_BUTTON_DPAD_UP           = key 2
