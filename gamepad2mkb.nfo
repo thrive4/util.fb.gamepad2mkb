@@ -1,3 +1,25 @@
+update v1.2 04/01/2024
+- refactored most gamepad input code for better handling
+  added independent acceleration per stick improved mouse
+  click with left and right trigers etc.
+- tweaked .mke(s)
+- corrected screensize factor acceleration
+  now polls while game is running
+- added modifier deadzone to thumb axis acceleration
+- added shift, ctrl and function keys 1 to 5 as configurable keys
+- corrected freefile variable type to long
+  integer causes issues when opening multiple
+  file in succession
+- trimmed utilfile.bas
+- updated sdl2.dll from 2.26.5.0 to 2.28.5.0
+- added locale nl and updated help.ini
+- phased out small sdl window
+- getuilabelvalue implemented full automatic spacing
+- expanded localization added dutch
+  todo translated string size and ui placement need work
+- note with the newer version of sdl
+  ram / handles and threads usage has been reduced
+
 update v1.1 28/10/2023
 - fixed log creation (missing message)
 - fixed appname made truncation .exe optional
@@ -39,8 +61,8 @@ esc                                 : close application
 ## mapping explained
 regular keys:     a-Z and 0 - 1
 example = key a, key 0, etc
-special keys:     return, escape
-example = key escape, key return
+special keys:     return, escape, ctrl and shift (left and right), f1 to f5
+example = key escape, key return, key rctrl, key lshift, key f1
 directional keys: up, down, left right
 example = key up, key down
 mouse buttons: mouse left, mouse right

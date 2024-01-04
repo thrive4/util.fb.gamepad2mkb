@@ -6,7 +6,7 @@
 
 ' init gamepad
 Dim As SDL_GameController Ptr controller = NULL
-dim runningamepad    as boolean = false
+'dim runningamepad    as boolean = false
 dim buttondowntime   as long
 dim buttonuptime     as long
 dim runningamepademu as boolean = false
@@ -32,14 +32,14 @@ Dim As ZString Ptr map = SDL_GameControllerMapping(controller)
 'simulate a key press gamepademu for games and apps windows only regardless of active or focused window
 ' via https://www.freebasic.net/forum/viewtopic.php?p=38761&hilit=SendInput#p38761 by MichaelW
 Sub sendkeyb(bVk As Byte, btstate as boolean)
-
     if bvk <> 0 then
         dim ki(0 to 1) as INPUT_
         ki(0).type          = INPUT_KEYBOARD
         ki(0).ki.dwFlags    = 1
         ki(1).ki.dwFlags    = KEYEVENTF_KEYUP
-        ' special case for directional keys, they do not work with keybd_event
+        ki(0).ki.wVk = null
         select case bVk
+            ' special case for directional keys, they do not work with keybd_event
             case 27
                 ki(0).ki.wVk        = VK_LEFT
                 ki(1).ki.wVk        = VK_LEFT
@@ -52,13 +52,27 @@ Sub sendkeyb(bVk As Byte, btstate as boolean)
             case 25
                 ki(0).ki.wVk        = VK_DOWN
                 ki(1).ki.wVk        = VK_DOWN
+            ' faux funtion keys 1 ~ 5 sendinput has issues todo needs broader scope
+            case 10
+                ki(0).ki.wVk        = VK_F1
+            case 11
+                ki(0).ki.wVk        = VK_F2
+            case 12
+                ki(0).ki.wVk        = VK_F3
+            case 13
+                ki(0).ki.wVk        = VK_F4
+            case 14
+                ki(0).ki.wVk        = VK_F5
             case 16 ' faux escape sendinput has issues with escape (ascii 27)
-                if btstate then
-                    keybd_event(0, MapVirtualKey(VK_ESCAPE, 0), KEYEVENTF_SCANCODE, 0)
-                else
-                    keybd_event(0, MapVirtualKey(VK_ESCAPE, 0), KEYEVENTF_SCANCODE Or KEYEVENTF_KEYUP, 0)
-                end if    
-                exit sub
+                ki(0).ki.wVk        = VK_ESCAPE
+            case 17 ' faux left ctrl sendinput has issues
+                ki(0).ki.wVk        = VK_LCONTROL
+            case 18 ' faux right ctrl sendinput has issues
+                ki(0).ki.wVk        = VK_RCONTROL
+            case 19 ' faux left shift sendinput has issues
+                ki(0).ki.wVk        = VK_LSHIFT
+            case 20 ' faux right shift sendinput has issues
+                ki(0).ki.wVk        = VK_RSHIFT
             case else
                 if btstate then
                     keybd_event(0, MapVirtualKey(bVk, 0), KEYEVENTF_SCANCODE, 0)
@@ -67,18 +81,28 @@ Sub sendkeyb(bVk As Byte, btstate as boolean)
                 end if    
                 exit sub
         end select
-        SendInput(2, @ki(0), sizeof(ki))
+        if  ki(0).ki.wVk <> null then
+            if btstate then
+                keybd_event(0, MapVirtualKey(ki(0).ki.wVk, 0), KEYEVENTF_SCANCODE, 0)
+            else
+                keybd_event(0, MapVirtualKey(ki(0).ki.wVk, 0), KEYEVENTF_SCANCODE Or KEYEVENTF_KEYUP, 0)
+            end if
+            ki(0).ki.wVk = null
+            exit sub
+        else
+            SendInput(2, @ki(0), sizeof(ki))
+        end if
     end if
 
 End Sub
 
 ' bind buttons to main loop
-function buttoninput(button as integer, event as SDL_Event) as boolean
+function buttoninput(button as integer, event as SDL_Event) as boolean 
+    ' simulate key event with sdl only works within running proces
     select case as const button
         ' buttons
         'SDL_CONTROLLER_BUTTON_INVALID = -1
         case SDL_CONTROLLER_BUTTON_A
-            ' simulate key event with sdl only works within running proces
             event.type = SDL_KEYDOWN
             event.key.keysym.sym = SDLK_RETURN
             SDL_PushEvent(@event)
@@ -149,10 +173,11 @@ Dim cnt         As Integer
 
 ' init mouse
 type mouseinit
-    deadzone    as single = 0.20
-    mouseacc    as single = 0.10
-    mouseaccx   as single = 0
-    mouseaccy   as single = 0
+    deadzone    as single = 128.0f
+    mouseacclx   as single = 0.0f
+    mouseaccly   as single = 0.0f
+    mouseaccrx   as single = 0.0f
+    mouseaccry   as single = 0.0f
     vpoint      as Point
 end type
 dim axis2mouse as mouseinit
@@ -195,7 +220,7 @@ type mapo
     settimeron          as string  = "btback"
     axl2mouse           as boolean = false
     axr2mouse           as boolean = false
-    deadzone            as single  = 0.20
+    deadzone            as single  = 0.20f
     showbuttonpress     as boolean = false
 end type
 dim gpmap as mapo
@@ -222,7 +247,19 @@ gpmap.bt(SDL_CONTROLLER_BUTTON_DPAD_RIGHT)      = "btdpright"
 ' todo needs better handling of key codes
 function convertbutton(sim as string) as integer
     dim dummy as string
+    sim = lcase(sim)
+    ' todo broader scope function keys see sendkeyb
     select case true
+        case sim = "key f1"
+            return 10
+        case sim = "key f2"
+            return 11
+        case sim = "key f3"
+            return 12
+        case sim = "key f4"
+            return 13
+        case sim = "key f5"
+            return 14
         case instr(sim, "key up") > 0
             return 24
         case instr(sim, "key down") > 0
@@ -237,6 +274,14 @@ function convertbutton(sim as string) as integer
             return 16 ' faux escape
         case instr(sim, "key return") > 0
             return 13
+        case instr(sim, "key lctrl") > 0
+            return 17
+        case instr(sim, "key rctrl") > 0
+            return 18
+        case instr(sim, "key lshift") > 0
+            return 19
+        case instr(sim, "key rshift") > 0
+            return 20
         case instr(sim, "key") > 0
             dummy = mid(sim, instr(sim, "key") + 4)
             return asc(ucase(dummy))
@@ -256,7 +301,7 @@ function getgamepadini(inifile as string, byref gpmap as mapo, byref gpmapaxis2k
     dim itm     as string
     dim inikey  as string
     dim inival  as string
-    dim f       as integer
+    dim f       as long
     if FileExists(inifile) = false then
         logentry("error", inifile + "file does not excist")
     else 
@@ -366,51 +411,107 @@ function getgamepadini(inifile as string, byref gpmap as mapo, byref gpmapaxis2k
 end function
 
 ' simulate mouse pointer movement or keyboard with stick left and right
-sub axis(byref axis2mouse as mouseinit, byref axisx as single, byref axisy as single, curscreenh as integer)
-    ' set acceleration
-    if axis2mouse.mouseaccx < curscreenh / 135 then
-        axis2mouse.mouseaccx += axis2mouse.mouseacc * abs(axisx)
+sub axis(byref axis2mouse as mouseinit, byref axisx as single, byref axisy as single, stick as string)
+
+    dim vecr as single = axis2mouse.mouseaccrx * axis2mouse.mouseaccrx + axis2mouse.mouseaccry * axis2mouse.mouseaccry
+    dim vecl as single = axis2mouse.mouseacclx * axis2mouse.mouseacclx + axis2mouse.mouseaccly * axis2mouse.mouseaccly
+
+    dim curscreenh as integer
+    dim curscreenw as integer
+    ' poll screen size while game is running
+    ScreenInfo curscreenw, curscreenh
+
+    if stick = "left" then
+        ' set acceleration
+        if axis2mouse.mouseacclx < (curscreenw * 0.04f) / (vecl * axis2mouse.deadzone) then
+            axis2mouse.mouseacclx += abs(axisx) * axis2mouse.deadzone
+        end if
+        if axis2mouse.mouseaccly < (curscreenh * 0.04f) / (vecl * axis2mouse.deadzone) then
+            axis2mouse.mouseaccly += abs(axisy) * axis2mouse.deadzone
+        end if
+            
+        ' windows api for mousepointer regardless of active or focused window
+        select case axisx
+            case is < -axis2mouse.deadzone 
+                select case axisy 
+                    case is < -axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseacclx,_
+                                     axis2mouse.vpoint.y - axis2mouse.mouseaccly)
+                    case is > axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseacclx,_
+                                     axis2mouse.vpoint.y + axis2mouse.mouseaccly)
+                    case else
+                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseacclx, axis2mouse.vpoint.y)
+                end select
+            case is > axis2mouse.deadzone
+                select case axisy
+                    case is < -axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseacclx,_
+                                     axis2mouse.vpoint.y - axis2mouse.mouseaccly)
+                    case is > axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseacclx,_
+                                     axis2mouse.vpoint.y + axis2mouse.mouseaccly)
+                    case else
+                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseacclx, axis2mouse.vpoint.y)
+                end select                            
+            case else
+                'stick movement up and down
+                select case axisy
+                    case is < -axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y - axis2mouse.mouseaccly)
+                    case is > axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y + axis2mouse.mouseaccly)
+                end select
+        end select
     end if
-    if axis2mouse.mouseaccy < curscreenh / 135 then
-        axis2mouse.mouseaccy += axis2mouse.mouseacc * abs(axisy)
+
+    if stick = "right" then
+        ' set acceleration
+        if axis2mouse.mouseaccrx < (curscreenw * 0.04f) / (vecr * axis2mouse.deadzone) then
+            axis2mouse.mouseaccrx += abs(axisx) * axis2mouse.deadzone
+        end if
+        if axis2mouse.mouseaccry < (curscreenh * 0.04f) / (vecr * axis2mouse.deadzone) then
+            axis2mouse.mouseaccry += abs(axisy) * axis2mouse.deadzone
+        end if
+            
+        ' windows api for mousepointer regardless of active or focused window
+        select case axisx
+            case is < -axis2mouse.deadzone 
+                select case axisy 
+                    case is < -axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseaccrx,_
+                                     axis2mouse.vpoint.y - axis2mouse.mouseaccry)
+                    case is > axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseaccrx,_
+                                     axis2mouse.vpoint.y + axis2mouse.mouseaccry)
+                    case else
+                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseaccrx, axis2mouse.vpoint.y)
+                end select
+            case is > axis2mouse.deadzone
+                select case axisy
+                    case is < -axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseaccrx,_
+                                     axis2mouse.vpoint.y - axis2mouse.mouseaccry)
+                    case is > axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseaccrx,_
+                                     axis2mouse.vpoint.y + axis2mouse.mouseaccry)
+                    case else
+                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseaccrx, axis2mouse.vpoint.y)
+                end select                            
+            case else
+                'stick movement up and down
+                select case axisy
+                    case is < -axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y - axis2mouse.mouseaccry)
+                    case is > axis2mouse.deadzone
+                        SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y + axis2mouse.mouseaccry)
+                end select
+        end select
     end if
-        
-    ' windows api for mousepointer regardless of active or focused window
-    select case axisx
-        case is < -axis2mouse.deadzone 
-            select case axisy 
-                case is < -axis2mouse.deadzone
-                    SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseaccx,_
-                                 axis2mouse.vpoint.y - axis2mouse.mouseaccy)
-                case is > axis2mouse.deadzone
-                    SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseaccx,_
-                                 axis2mouse.vpoint.y + axis2mouse.mouseaccy)
-                case else
-                    SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseaccx, axis2mouse.vpoint.y)
-            end select
-        case is > axis2mouse.deadzone
-            select case axisy
-                case is < -axis2mouse.deadzone
-                    SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseaccx,_
-                                 axis2mouse.vpoint.y - axis2mouse.mouseaccy)
-                case is > axis2mouse.deadzone
-                    SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseaccx,_
-                                 axis2mouse.vpoint.y + axis2mouse.mouseaccy)
-                case else
-                    SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseaccx, axis2mouse.vpoint.y)
-            end select                            
-        case else
-            'stick movement up and down
-            select case axisy
-                case is < -axis2mouse.deadzone
-                    SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y - axis2mouse.mouseaccy)
-                case is > axis2mouse.deadzone
-                    SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y + axis2mouse.mouseaccy)
-            end select
-    end select
+
 end sub
 
-function axis2key (axisanddir as integer, ax as single, byref gpmapaxis2key as mapaxis2key) as single
+function axis2key(axisanddir as integer, ax as single, byref gpmapaxis2key as mapaxis2key) as single
 
     if gpmapaxis2key.axisdir(axisanddir) then
         if gpmapaxis2key.axislab(axisanddir) <> "" then
@@ -434,14 +535,12 @@ function mouseclick(byref axis2mouse as mouseinit, button as string, press as bo
         case "mouse left"
             if press then
                 mouse_event(MOUSEEVENTF_LEFTDOWN, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
-                sdl_delay(10)
             else
                 mouse_event(MOUSEEVENTF_LEFTUP, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
             end if
         case "mouse right"
             if press then
                 mouse_event(MOUSEEVENTF_RIGHTDOWN, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
-                sdl_delay(10)
             else
                 mouse_event(MOUSEEVENTF_RIGHTUP, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
             end if

@@ -1,6 +1,6 @@
 ## gamepad2mkb
 basic mouse and keyboard emulator via gamepad\
-written in freebasic and sdl2\
+supports directx and xinput\
 a specific key can be used for timed actions example\
 settimerduration    = 2.5\
 settimeron          = btback
@@ -15,23 +15,24 @@ or specify a path via \conf\conf.ini
 paddefinition = conf\<filename>.mke
 
 ## requirements
-sdl2 (32bit) v2.24.2.0\
+sdl2 (32bit) v2.28.5.0\
 https://github.com/libsdl-org/SDL/releases
 
 ## performance
 windows 7 / windows 10(1903)\
-ram usage ~5MB / 5MB\
-handles   ~148 / ~200\
-threads   ~6   / ~10\
+ram usage ~2MB / 2MB\
+handles   ~112 / ~300\
+threads   ~1   / ~7\
 cpu       ~0%  / ~0%\
 tested on intel i5-6600T
+
 ## navigation
-esc                                 : close application
+close window \ console : close application
 ## mapping explained
 regular keys:     a-Z and 0 - 1\
 example = key a, key 0, etc\
-special keys:     return, escape\
-example = key escape, key return\
+special keys:     return, escape, ctrl and shift (left and right), f1 to f5\
+example = key escape, key return, key rctrl, key lshift, key f1\
 directional keys: up, down, left right\
 example = key up, key down\
 mouse buttons: mouse left, mouse right\

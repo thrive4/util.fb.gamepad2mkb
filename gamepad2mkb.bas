@@ -24,12 +24,29 @@ If (SDL_Init(SDL_INIT_VIDEO) = not NULL) Then
 else
     ' app does not use sdl audio
     SDL_QuitSubSystem(SDL_INIT_AUDIO)
+    SDL_QuitSubSystem(SDL_INIT_HAPTIC)
     ' render scale quality: 0 point, 1 linear, 2 anisotropic
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0")
+    ' filter non used events
+    SDL_EventState(SDL_FINGERMOTION,    SDL_IGNORE)
+    SDL_EventState(SDL_FINGERDOWN,      SDL_IGNORE)
+    SDL_EventState(SDL_FINGERUP,        SDL_IGNORE)
+    SDL_EventState(SDL_MULTIGESTURE,    SDL_IGNORE)
+    SDL_EventState(SDL_DOLLARGESTURE,   SDL_IGNORE)
+    SDL_EventState(SDL_JOYBALLMOTION,   SDL_IGNORE)
+    SDL_EventState(SDL_DROPFILE,        SDL_IGNORE)
+
+' still linked to SDL_CONTROLLER
+    'SDL_EventState(SDL_JOYAXISMOTION,   SDL_IGNORE)
+    'SDL_EventState(SDL_JOYHATMOTION,    SDL_IGNORE)
+    'SDL_EventState(SDL_JOYBUTTONDOWN,   SDL_IGNORE)
+    'SDL_EventState(SDL_JOYBUTTONUP,     SDL_IGNORE)
+    'SDL_EventState(SDL_JOYDEVICEADDED,  SDL_IGNORE)
+    'SDL_EventState(SDL_JOYDEVICEREMOVED,SDL_IGNORE)
 End If
 
 If (SDL_Init(SDL_INIT_GAMECONTROLLER) = not NULL) Then
-    logentry("warning", "sdl2 gamecontroller could not be initlized error: " + *SDL_GetError())
+    logentry("fatal", "sdl2 gamecontroller could not be initlized error: " + *SDL_GetError())
 End If
 
 dim screenwidth         As integer  = 320
@@ -38,23 +55,6 @@ dim shared curscreenw   as integer
 dim shared curscreenh   as integer
 Dim As SDL_Window Ptr glass
 Dim As SDL_Texture Ptr texture
-ScreenInfo curscreenw, curscreenh
-
-
-glass = SDL_CreateWindow("gamepad", 100, 100, screenwidth, screenheight, SDL_WINDOW_MINIMIZED)
-SDL_SetWindowResizable(glass, sdl_false)
-SDL_ShowCursor(SDL_ENABLE)
-if (glass = NULL) Then
-    logentry("error", "sdl2 could not create window")
-    SDL_Quit()
-End If
-
-' renderer
-Dim As SDL_Renderer Ptr renderer = SDL_CreateRenderer(glass, -1, null)
-if (renderer = NULL) Then
-    logentry("error", "sdl2 could not create render")
-    SDL_Quit()
-End If
 
 ' load gamepad
 controller = SDL_GameControllerOpen(0)
@@ -78,7 +78,7 @@ end if
 'sleep 3000
 
 function lerp(lstart as single, lend as single, lstep as single) as single
-    return (1 - lstep) * lstart + lstep * lend
+    return (1.0f - lstep) * lstart + lstep * lend
 end function
 
 ' init app with config file if present conf.ini
@@ -86,7 +86,7 @@ dim itm     as string
 dim inikey  as string
 dim inival  as string
 dim inifile as string = exepath + "\conf\conf.ini"
-dim f       as integer
+dim f       as long
 if FileExists(inifile) = false then
     logentry("error", inifile + " file does not excist")
 else 
@@ -152,91 +152,86 @@ print imagefolder
 getgamepadini(imagefolder, gpmap, gpmapaxis2key)
 
 ' todo make more consistent
-axis2mouse.deadzone = gpmap.deadzone
-print "using map: " + space(len("current gamepad") - 9) + paddefinition
-print "deadzone:  " + space(len("current gamepad") - 9) & axis2mouse.deadzone
-
+axis2mouse.deadzone = gpmap.deadzone * 0.002f
+'print "using map: " + space(len("current gamepad") - 9) + paddefinition
+'print "deadzone:  " + space(len("current gamepad") - 9) & axis2mouse.deadzone
+readuilabel(exepath + "\conf\" + locale + "\menu.ini")
+getuilabelvalue("using map", paddefinition)
+getuilabelvalue("deadzone" , str(axis2mouse.deadzone))
 while runningmain
+    ' todo use to get deadzones both sticks
+    'print SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTX)
+    'print SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX)
 
     ' windows api for mousepointer regardless of active or focused window
     GetCursorPos(@axis2mouse.vpoint)
 
     ' gamepad axis handeld by sdl can deal with xinput / dinput toggle
-    lsx = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX),  32767 * 0.000000001)
-    lsy = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY),  32767 * 0.000000001)
-    rsx = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTX), 32767 * 0.000000001)
-    rsy = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTY), 32767 * 0.000000001)
+    lsx = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX),  32767 * 0.000000001f)
+    lsy = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY),  32767 * 0.000000001f)
+    rsx = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTX), 32767 * 0.000000001f)
+    rsy = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTY), 32767 * 0.000000001f)
+    ' start polling left and right stick if axis value is larger than sdl deadzone
+    if rsx * rsx + rsy * rsy > axis2mouse.deadzone or lsx * lsx + lsy * lsy > axis2mouse.deadzone then
+        ' get deadzone per axis
+        ' lstick_left_2keyaw
+        gpmapaxis2key.axisdir(1) = iif (lsx < -axis2mouse.deadzone * 2.5f, true, false)
+        ' lstick_right_2key
+        gpmapaxis2key.axisdir(2) = iif (lsx > axis2mouse.deadzone  * 2.5f, true, false)
+        '  lstick_up_2key
+        gpmapaxis2key.axisdir(3) = iif (lsy < -axis2mouse.deadzone * 2.5f, true, false)
+        ' lstick_down_2key
+        gpmapaxis2key.axisdir(4) = iif (lsy > axis2mouse.deadzone  * 2.5f, true, false)
+        ' rstick_left_2key
+        gpmapaxis2key.axisdir(5) = iif (rsx < -axis2mouse.deadzone * 2.5f, true, false)
+        ' rstick_right_2key
+        gpmapaxis2key.axisdir(6) = iif (rsx > axis2mouse.deadzone  * 2.5f, true, false)
+        ' rstick_up_2key
+        gpmapaxis2key.axisdir(7) = iif (rsy < -axis2mouse.deadzone * 2.5f, true, false)
+        ' rstick_down_2key
+        gpmapaxis2key.axisdir(8) = iif (rsy > axis2mouse.deadzone  * 2.5f, true, false)
+        
+        ' left axis mapped to mouse pointer or keys
+        if gpmap.axl2mouse then
+            axis(axis2mouse, lsx, lsy, "left")
+        else
+            ' lstick_left_2key
+            lsx = axis2key(1, lsx, gpmapaxis2key)
+            ' lstick_right_2key
+            lsx = axis2key(2, lsx, gpmapaxis2key)
+            '  lstick_up_2key
+            lsy = axis2key(3, lsy, gpmapaxis2key)
+            ' lstick_down_2key
+            lsy = axis2key(4, lsy, gpmapaxis2key)
+        end if
 
-    ' get deadzone per axis
-    ' lstick_left_2keyaw
-    gpmapaxis2key.axisdir(1) = iif (lsx < -axis2mouse.deadzone, true, false)
-    ' lstick_right_2key
-    gpmapaxis2key.axisdir(2) = iif (lsx > axis2mouse.deadzone, true, false)
-    '  lstick_up_2key
-    gpmapaxis2key.axisdir(3) = iif (lsy < -axis2mouse.deadzone, true, false)
-    ' lstick_down_2key
-    gpmapaxis2key.axisdir(4) = iif (lsy > axis2mouse.deadzone, true, false)
-    ' rstick_left_2key
-    gpmapaxis2key.axisdir(5) = iif (rsx < -axis2mouse.deadzone, true, false)
-    ' rstick_right_2key
-    gpmapaxis2key.axisdir(6) = iif (rsx > axis2mouse.deadzone, true, false)
-    ' rstick_up_2key
-    gpmapaxis2key.axisdir(7) = iif (rsy < -axis2mouse.deadzone, true, false)
-    ' rstick_down_2key
-    gpmapaxis2key.axisdir(8) = iif (rsy > axis2mouse.deadzone, true, false)
-    
+        ' right axis mapped to mouse pointer or keys
+        if gpmap.axr2mouse then
+            axis(axis2mouse, rsx, rsy, "right")
+        else
+            ' rstick_left_2key
+            rsx = axis2key(5, rsx, gpmapaxis2key)
+            ' rstick_right_2key
+            rsx = axis2key(6, rsx, gpmapaxis2key)
+            ' rstick_up_2key
+            rsy = axis2key(7, rsy, gpmapaxis2key)
+            ' rstick_down_2key
+            rsy = axis2key(8, rsy, gpmapaxis2key)
+        end if
+    end if
     ' reset acceleration
-    if gpmapaxis2key.axisdir(1) = false and gpmapaxis2key.axisdir(2) = false and _
-       gpmapaxis2key.axisdir(3) = false and gpmapaxis2key.axisdir(4) = false and _
-       gpmapaxis2key.axisdir(5) = false and gpmapaxis2key.axisdir(6) = false and _
-       gpmapaxis2key.axisdir(7) = false and gpmapaxis2key.axisdir(8) = false then
-                axis2mouse.mouseaccx = 0
-                axis2mouse.mouseaccy = 0
+    if rsx * rsx + rsy * rsy < axis2mouse.deadzone then
+        axis2mouse.mouseaccrx = 0
+        axis2mouse.mouseaccry = 0
     end if
-
-    ' axis mapped to aw
-    ' lstick_left_2key
-    lsx = axis2key(1, lsx, gpmapaxis2key)
-    ' lstick_right_2key
-    lsx = axis2key(2, lsx, gpmapaxis2key)
-    '  lstick_up_2key
-    lsy = axis2key(3, lsy, gpmapaxis2key)
-    ' lstick_down_2key
-    lsy = axis2key(4, lsy, gpmapaxis2key)
-    ' rstick_left_2key
-    rsx = axis2key(5, rsx, gpmapaxis2key)
-    ' rstick_right_2key
-    rsx = axis2key(6, rsx, gpmapaxis2key)
-    ' rstick_up_2key
-    rsy = axis2key(7, rsy, gpmapaxis2key)
-    ' rstick_down_2key
-    rsy = axis2key(8, rsy, gpmapaxis2key)
-
-    ' left axis mapped to mouse pointer
-    if gpmap.axl2mouse then
-        if gpmapaxis2key.axisdir(1) or gpmapaxis2key.axisdir(2) or _
-           gpmapaxis2key.axisdir(3) or gpmapaxis2key.axisdir(4) then
-            axis(axis2mouse, lsx, lsy, curscreenh)
-        end if
-    end if
-
-    ' right axis mapped to mouse pointer
-    if gpmap.axr2mouse then
-        if gpmapaxis2key.axisdir(5) or gpmapaxis2key.axisdir(6) or _
-           gpmapaxis2key.axisdir(7) or gpmapaxis2key.axisdir(8) then
-            ' dinput
-            axis(axis2mouse, rsx, rsy, curscreenh)
-        end if
+    if lsx * lsx + lsy * lsy < axis2mouse.deadzone then
+        axis2mouse.mouseacclx = 0
+        axis2mouse.mouseaccly = 0
     end if
 
     ' note polling on sdlevent is necessary otherwise there is no ouput
     while SDL_PollEvent(@event) <> 0
-        ' basic window interaction
         select case event.type
-            case SDL_KEYDOWN and event.key.keysym.sym = SDLK_ESCAPE
-                runningmain = False
-            case SDL_WINDOWEVENT and event.window.event = SDL_WINDOWEVENT_CLOSE
-                runningmain = False     
             case SDL_CONTROLLERBUTTONDOWN
                 buttondowntime = SDL_GetTicks()
                 if instr(gpmap.lb(event.cbutton.button), "mouse") > 0 then
@@ -261,13 +256,15 @@ while runningmain
                 end if
                 buttonuptime = 0
                 buttondowntime = 0
+            ' only used for left and right triggers range from 0 to 32767
             case SDL_CONTROLLERAXISMOTION
-                ' triggers range from 0 to 32767
                 if event.caxis.axis = SDL_CONTROLLER_AXIS_TRIGGERLEFT then
                     if event.caxis.value > 1000 then
                         buttondowntime = SDL_GetTicks()
                         if instr(gpmap.lb(event.caxis.axis + 100), "mouse") > 0 then
                             mouseclick(axis2mouse, gpmap.lb(event.caxis.axis + 100), true)
+                            ' prevent stutter todo timing issue needs more thought
+                            sdl_delay(200)
                         else
                             sendkeyb(gpmap.vl(event.caxis.axis + 100), true)
                         end if
@@ -291,6 +288,8 @@ while runningmain
                         buttondowntime = SDL_GetTicks()
                         if instr(gpmap.lb(event.caxis.axis + 100), "mouse") > 0 then
                             mouseclick(axis2mouse, gpmap.lb(event.caxis.axis + 100), true)
+                            ' prevent stutter todo timing issue needs more thought
+                            sdl_delay(200)
                         else
                             sendkeyb(gpmap.vl(event.caxis.axis + 100), true)
                         end if
@@ -313,7 +312,8 @@ while runningmain
                 SDL_free(map)
                 SDL_GameControllerClose(controller)
                 controller = SDL_GameControllerOpen(0)
-                print "current gamepad: " & *SDL_GameControllerName(controller)
+                'print "current gamepad: " & *SDL_GameControllerName(controller)
+                getuilabelvalue("current gamepad" , "" + *SDL_GameControllerName(controller))
                 logentry("notice", "switched to game controller: " & *SDL_GameControllerName(controller))
                 map = SDL_GameControllerMapping(controller)
         end select
@@ -325,8 +325,6 @@ while runningmain
 wend
 
 ' Free all resources allocated by SDL
-SDL_DestroyRenderer(renderer)
-SDL_DestroyWindow(glass)
 SDL_free(map)
 SDL_GameControllerClose(controller)
 SDL_Quit()
