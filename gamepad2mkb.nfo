@@ -1,3 +1,15 @@
+update v1.3 16/10/2025
+- refactored gamepad axis to mouse handling
+  implemented radial deadzone and acceleration
+  logic independent of deadzone size
+- added acceleration configurable via .mke
+- regression checkpath (see 1.1) fixed again
+- slimmed down function explode
+- update sdl2.dll from 2.28.5.0 to 2.32.4.0
+- update generic file functions added drive label and storage
+  and convertbytesize
+- added spanish  
+
 update v1.2 04/01/2024
 - refactored most gamepad input code for better handling
   added independent acceleration per stick improved mouse

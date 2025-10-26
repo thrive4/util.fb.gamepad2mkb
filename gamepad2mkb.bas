@@ -14,6 +14,7 @@ dim dummy         as string = ""
 dim fileext       as string = ""
 dim filetypes     as string = ".mke"
 dim imagefolder   as string
+dim locale        as string = "en"
 
 'init sdl
 dim event            as SDL_Event
@@ -53,8 +54,6 @@ dim screenwidth         As integer  = 320
 dim screenheight        As integer  = 280
 dim shared curscreenw   as integer
 dim shared curscreenh   as integer
-Dim As SDL_Window Ptr glass
-Dim As SDL_Texture Ptr texture
 
 ' load gamepad
 controller = SDL_GameControllerOpen(0)
@@ -116,6 +115,15 @@ else
     close(f)    
 end if
 
+' verify locale otherwise set default
+select case locale
+    case "en", "es", "de", "fr", "nl"
+        ' nop
+    case else
+        logentry("error", "unsupported locale " + locale + " applying default setting")
+        locale = "en"
+end select
+
 ' parse commandline for options overides conf.ini settings
 select case command(1)
     case "/?", "-man"
@@ -152,7 +160,10 @@ print imagefolder
 getgamepadini(imagefolder, gpmap, gpmapaxis2key)
 
 ' todo make more consistent
-axis2mouse.deadzone = gpmap.deadzone * 0.002f
+axis2mouse.deadzone    = gpmap.deadzone * 0.002f
+axis2mouse.acceleratex = gpmap.acceleratex
+axis2mouse.acceleratey = gpmap.acceleratey
+dim ax2mdzk as single  = axis2mouse.deadzone * 4.5f
 'print "using map: " + space(len("current gamepad") - 9) + paddefinition
 'print "deadzone:  " + space(len("current gamepad") - 9) & axis2mouse.deadzone
 readuilabel(exepath + "\conf\" + locale + "\menu.ini")
@@ -167,29 +178,29 @@ while runningmain
     GetCursorPos(@axis2mouse.vpoint)
 
     ' gamepad axis handeld by sdl can deal with xinput / dinput toggle
-    lsx = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX),  32767 * 0.000000001f)
-    lsy = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY),  32767 * 0.000000001f)
-    rsx = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTX), 32767 * 0.000000001f)
-    rsy = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTY), 32767 * 0.000000001f)
+    lsx = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX),  0.000032767f)
+    lsy = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY),  0.000032767f)
+    rsx = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTX), 0.000032767f)
+    rsy = lerp(0, SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTY), 0.000032767f)
     ' start polling left and right stick if axis value is larger than sdl deadzone
     if rsx * rsx + rsy * rsy > axis2mouse.deadzone or lsx * lsx + lsy * lsy > axis2mouse.deadzone then
         ' get deadzone per axis
         ' lstick_left_2keyaw
-        gpmapaxis2key.axisdir(1) = iif (lsx < -axis2mouse.deadzone * 2.5f, true, false)
+        gpmapaxis2key.axisdir(1) = iif (lsx < -ax2mdzk, true, false)
         ' lstick_right_2key
-        gpmapaxis2key.axisdir(2) = iif (lsx > axis2mouse.deadzone  * 2.5f, true, false)
+        gpmapaxis2key.axisdir(2) = iif (lsx >  ax2mdzk, true, false)
         '  lstick_up_2key
-        gpmapaxis2key.axisdir(3) = iif (lsy < -axis2mouse.deadzone * 2.5f, true, false)
+        gpmapaxis2key.axisdir(3) = iif (lsy < -ax2mdzk, true, false)
         ' lstick_down_2key
-        gpmapaxis2key.axisdir(4) = iif (lsy > axis2mouse.deadzone  * 2.5f, true, false)
+        gpmapaxis2key.axisdir(4) = iif (lsy >  ax2mdzk, true, false)
         ' rstick_left_2key
-        gpmapaxis2key.axisdir(5) = iif (rsx < -axis2mouse.deadzone * 2.5f, true, false)
+        gpmapaxis2key.axisdir(5) = iif (rsx < -ax2mdzk, true, false)
         ' rstick_right_2key
-        gpmapaxis2key.axisdir(6) = iif (rsx > axis2mouse.deadzone  * 2.5f, true, false)
+        gpmapaxis2key.axisdir(6) = iif (rsx >  ax2mdzk, true, false)
         ' rstick_up_2key
-        gpmapaxis2key.axisdir(7) = iif (rsy < -axis2mouse.deadzone * 2.5f, true, false)
+        gpmapaxis2key.axisdir(7) = iif (rsy < -ax2mdzk, true, false)
         ' rstick_down_2key
-        gpmapaxis2key.axisdir(8) = iif (rsy > axis2mouse.deadzone  * 2.5f, true, false)
+        gpmapaxis2key.axisdir(8) = iif (rsy >  ax2mdzk, true, false)
         
         ' left axis mapped to mouse pointer or keys
         if gpmap.axl2mouse then

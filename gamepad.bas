@@ -173,12 +173,14 @@ Dim cnt         As Integer
 
 ' init mouse
 type mouseinit
-    deadzone    as single = 128.0f
+    deadzone     as single = 128.0f
+    acceleratex  as single = 0.0f
+    acceleratey  as single = 0.0f
     mouseacclx   as single = 0.0f
     mouseaccly   as single = 0.0f
     mouseaccrx   as single = 0.0f
     mouseaccry   as single = 0.0f
-    vpoint      as Point
+    vpoint       as Point
 end type
 dim axis2mouse as mouseinit
 
@@ -220,7 +222,9 @@ type mapo
     settimeron          as string  = "btback"
     axl2mouse           as boolean = false
     axr2mouse           as boolean = false
-    deadzone            as single  = 0.20f
+    deadzone            as single  = 0.05f
+    acceleratex         as single  = 10.0f
+    acceleratey         as single  = 10.0f 
     showbuttonpress     as boolean = false
 end type
 dim gpmap as mapo
@@ -321,6 +325,10 @@ function getgamepadini(inifile as string, byref gpmap as mapo, byref gpmapaxis2k
                             gpmap.settimeron = inival
                         case "deadzone"
                             gpmap.deadzone = csng(inival)
+                        case "acceleratex"
+                            gpmap.acceleratex = csng(inival)
+                        case "acceleratey"
+                            gpmap.acceleratey = csng(inival)
                         case "lstick_left_2key"
                             gpmapaxis2key.axislab(1) = inival
                             gpmapaxis2key.axisval(1) = convertbutton(inival)
@@ -412,103 +420,47 @@ end function
 
 ' simulate mouse pointer movement or keyboard with stick left and right
 sub axis(byref axis2mouse as mouseinit, byref axisx as single, byref axisy as single, stick as string)
-
-    dim vecr as single = axis2mouse.mouseaccrx * axis2mouse.mouseaccrx + axis2mouse.mouseaccry * axis2mouse.mouseaccry
-    dim vecl as single = axis2mouse.mouseacclx * axis2mouse.mouseacclx + axis2mouse.mouseaccly * axis2mouse.mouseaccly
-
-    dim curscreenh as integer
-    dim curscreenw as integer
-    ' poll screen size while game is running
+    dim curscreenw as integer, curscreenh as integer
     ScreenInfo curscreenw, curscreenh
 
+    dim accelx as single ptr, accely as single ptr
     if stick = "left" then
-        ' set acceleration
-        if axis2mouse.mouseacclx < (curscreenw * 0.04f) / (vecl * axis2mouse.deadzone) then
-            axis2mouse.mouseacclx += abs(axisx) * axis2mouse.deadzone
-        end if
-        if axis2mouse.mouseaccly < (curscreenh * 0.04f) / (vecl * axis2mouse.deadzone) then
-            axis2mouse.mouseaccly += abs(axisy) * axis2mouse.deadzone
-        end if
-            
-        ' windows api for mousepointer regardless of active or focused window
-        select case axisx
-            case is < -axis2mouse.deadzone 
-                select case axisy 
-                    case is < -axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseacclx,_
-                                     axis2mouse.vpoint.y - axis2mouse.mouseaccly)
-                    case is > axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseacclx,_
-                                     axis2mouse.vpoint.y + axis2mouse.mouseaccly)
-                    case else
-                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseacclx, axis2mouse.vpoint.y)
-                end select
-            case is > axis2mouse.deadzone
-                select case axisy
-                    case is < -axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseacclx,_
-                                     axis2mouse.vpoint.y - axis2mouse.mouseaccly)
-                    case is > axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseacclx,_
-                                     axis2mouse.vpoint.y + axis2mouse.mouseaccly)
-                    case else
-                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseacclx, axis2mouse.vpoint.y)
-                end select                            
-            case else
-                'stick movement up and down
-                select case axisy
-                    case is < -axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y - axis2mouse.mouseaccly)
-                    case is > axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y + axis2mouse.mouseaccly)
-                end select
-        end select
+        accelx = @axis2mouse.mouseacclx
+        accely = @axis2mouse.mouseaccly
+    else
+        accelx = @axis2mouse.mouseaccrx
+        accely = @axis2mouse.mouseaccry
+    end if
+    ' radial magnitude of stick input
+    dim mag as single = sqr(axisx * axisx + axisy * axisy)
+
+    if mag > axis2mouse.deadzone then
+        ' normalize input vector to preserve direction
+        dim normX as single = axisx / mag
+        dim normY as single = axisy / mag
+        ' normalize magnitude to [0..1] range ignoring deadzone
+        dim normMag as single = (mag - axis2mouse.deadzone) / (1.0 - axis2mouse.deadzone)
+        ' scale normalized vector by normalized magnitude
+        dim scaledX as single = normX * normMag
+        dim scaledY as single = normY * normMag
+
+        *accelx = (abs(scaledX) ^ 2.2) * axis2mouse.acceleratex
+        *accely = (abs(scaledY) ^ 2.2) * axis2mouse.acceleratey
+
+        axis2mouse.vpoint.x += sgn(scaledX) * *accelx
+        axis2mouse.vpoint.y += sgn(scaledY) * *accely
+    else
+        ' decrease acceleration
+        *accelx *= 0.3
+        *accely *= 0.3
     end if
 
-    if stick = "right" then
-        ' set acceleration
-        if axis2mouse.mouseaccrx < (curscreenw * 0.04f) / (vecr * axis2mouse.deadzone) then
-            axis2mouse.mouseaccrx += abs(axisx) * axis2mouse.deadzone
-        end if
-        if axis2mouse.mouseaccry < (curscreenh * 0.04f) / (vecr * axis2mouse.deadzone) then
-            axis2mouse.mouseaccry += abs(axisy) * axis2mouse.deadzone
-        end if
-            
-        ' windows api for mousepointer regardless of active or focused window
-        select case axisx
-            case is < -axis2mouse.deadzone 
-                select case axisy 
-                    case is < -axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseaccrx,_
-                                     axis2mouse.vpoint.y - axis2mouse.mouseaccry)
-                    case is > axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseaccrx,_
-                                     axis2mouse.vpoint.y + axis2mouse.mouseaccry)
-                    case else
-                        SetCursorPos(axis2mouse.vpoint.x - axis2mouse.mouseaccrx, axis2mouse.vpoint.y)
-                end select
-            case is > axis2mouse.deadzone
-                select case axisy
-                    case is < -axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseaccrx,_
-                                     axis2mouse.vpoint.y - axis2mouse.mouseaccry)
-                    case is > axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseaccrx,_
-                                     axis2mouse.vpoint.y + axis2mouse.mouseaccry)
-                    case else
-                        SetCursorPos(axis2mouse.vpoint.x + axis2mouse.mouseaccrx, axis2mouse.vpoint.y)
-                end select                            
-            case else
-                'stick movement up and down
-                select case axisy
-                    case is < -axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y - axis2mouse.mouseaccry)
-                    case is > axis2mouse.deadzone
-                        SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y + axis2mouse.mouseaccry)
-                end select
-        end select
-    end if
+    if axis2mouse.vpoint.x < 0 then axis2mouse.vpoint.x = 0
+    if axis2mouse.vpoint.y < 0 then axis2mouse.vpoint.y = 0
+    if axis2mouse.vpoint.x > curscreenw - 1 then axis2mouse.vpoint.x = curscreenw - 1
+    if axis2mouse.vpoint.y > curscreenh - 1 then axis2mouse.vpoint.y = curscreenh - 1
 
+    SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y)
 end sub
 
 function axis2key(axisanddir as integer, ax as single, byref gpmapaxis2key as mapaxis2key) as single

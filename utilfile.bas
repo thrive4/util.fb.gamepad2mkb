@@ -4,12 +4,6 @@
 #include once "vbcompat.bi"
 #include once "dir.bi"
 
-' disable filename globbing otherwise g:\* list files
-' when using command how ever conflicts with dir()
-' also odd this is used for 64bits but works with 32bits
-' Extern _dowildcard Alias "_dowildcard" As Long
-'Dim Shared _dowildcard As Long = 0
-
 ' setup log
 dim shared logfile    as string
 dim shared logtype    as string
@@ -109,7 +103,7 @@ Function logentry(entrytype As String, logmsg As String) As Boolean
     return true
 End function
 
-' get fileversion executable or dll windows only
+' get fileversion executable or dll
 function getfileversion(versinfo() as string, versdesc() as string) as integer
 
     dim as integer bytesread,c,dwHandle,res,verSize
@@ -161,25 +155,95 @@ end function
 
 ' generic file functions
 ' ______________________________________________________________________________'
+' sample code for calling the function getfolders and getfilesfromfolder
+'ReDim As String ordinance(0)
+'getfilesfromfolder("i:\games\*", ordinance())
+'print UBound(ordinance)
+'For x As Integer = 1 To UBound(ordinance)
+'    Print ordinance(x)
+'Next
 
 ' list files in folder
-function getfilesfromfolder (filespec As String) as boolean
-    Dim As String filename = Dir(filespec, 1)
+function getfilesfromfolder(filespec As String, ordinance() As String) as uinteger
+    Dim As UInteger x      = 0 'counter
+    Dim As String filename = Dir(filespec, fbnormal, fbHidden and fbSystem and fbArchive and fbReadOnly)
+
     if len(filename) = 0 then print "path not found..." end if
     Do While Len(filename) > 0
+        x += 1
+        ReDim Preserve ordinance(x) 'create new array element
+        ordinance(x) = filename
         filename = Dir()
     Loop
-    return true
+
+    return x
+
 end function
 
 ' list folders
-function getfolders (filespec As String) as boolean
-    Dim As String filename = Dir(filespec, fbDirectory)
+function getfolders (filespec As String, ordinance() As String) as uinteger
+    Dim As UInteger x = 0 'counter
+    var mask          = fbDirectory or fbHidden or fbSystem or fbArchive or fbReadOnly
+    var attrib        = 0
+    var filename      = dir( filespec, mask, attrib )
+    
     if len(filename) = 0 then print "path not found..." end if
-    Do While Len(filename) > 0
-        filename = Dir()
-    Loop
-    return true
+    ' show directory regardless if it is system, hidden, read-only, or archive
+    while(filename > "")
+        if(attrib and fbDirectory) and (filename <> "." and filename <> "..") then
+            x += 1
+            ReDim Preserve ordinance(x) 'create new array element
+            ordinance(x) = filename
+        end if
+        filename= dir(attrib)
+    wend
+
+    return x
+
+end function
+
+function getdrivelabel(drive as string) as string
+    Dim As ZString * 1024 deviceName
+    Dim As ZString * 1024 volumeName
+    QueryDosDevice(drive, deviceName, 1024)
+    GetVolumeInformation(drive, volumeName, 1024, 0, 0, 0, 0, 0)
+    return volumeName
+end function
+
+function getdrivestorage(drive as string, metric as string) as ULongInt
+    Dim As ULARGE_INTEGER freeBytesAvailable
+    Dim As ULARGE_INTEGER totalNumberOfBytes
+    Dim As ULARGE_INTEGER totalNumberOfFreeBytes
+    If GetDiskFreeSpaceEx(drive, @freeBytesAvailable, @totalNumberOfBytes, @totalNumberOfFreeBytes) Then
+        select case metric
+            case "capacity"
+                return totalNumberOfBytes.QuadPart
+            case "space"
+                return totalNumberOfFreeBytes.QuadPart
+            case else
+                return 0
+        end select
+    Else
+    '    Print "Error: "; GetLastError()
+        return 0
+    End If
+end function
+
+function convertbytesize(totalsize as longint) as string
+
+    dim size as string
+    if totalsize < 1024 then
+        size = str(totalsize) & " bytes"
+    elseif totalsize < 1048576 then
+        size = format(totalsize / 1024.0, "0.00") & " KB"
+    elseif totalsize < 1073741824 then
+        size = format(totalsize / 1048576.0, "0.00") & " MB"
+    else
+        size = format(totalsize / 1073741824.0, "0.00") & " GB"
+    end if
+
+    return size
+
 end function
 
 ' create a new file
@@ -190,24 +254,6 @@ Function newfile(filename As String) As boolean
         logentry("warning", "creating " + filename + " file excists")
         return false
     end if    
-
-    f = FreeFile
-    Open filename For output As #f
-    logentry("notice", filename + " created")
-    close(f)
-    return true
-
-End Function
-
-' create a temp file
-Function tmpfile(filename As String) As boolean
-    Dim f As long
-
-    if FileExists(filename) = true then
-      If Kill(filename) <> 0 Then
-          logentry("warning", "could not delete " + filename )
-      end if
-    end if
 
     f = FreeFile
     Open filename For output As #f
@@ -273,27 +319,38 @@ Function checkpath(chkpath As String) As boolean
         return false
     end if
 
+    chdir(dummy)
     return true
 
 End Function
+
+' resolve path commandline argument
+Function resolvepath(path As String) As String
+
+    Dim buffer        as String * 260
+    dim resolvedpath  as string
+    Dim length        as Integer 
+    length = GetFullPathName(path, 260, buffer, Null)
+
+    resolvedpath = Left(buffer, length)
+    if checkpath(resolvedpath) = false and instr(path, "..") = 0 then
+        resolvedpath = path
+    end if  
+
+    return resolvedpath
+
+end function
 
 ' localization file functions
 ' ______________________________________________________________________________'
 
 ' localization can be applied by getting a locale or other method
-dim locale as string = "en"
 sub displayhelp(locale as string)
     dim dummy as string
     dim f     as long
     f = freefile
 
     ' get text
-    if FileExists(exepath + "\conf\" + locale + "\help.ini") then
-        'nop
-    else
-        logentry("error", "open " + exepath + "\conf\" + locale + "\help.ini" + " file does not excist")
-        locale = "en"
-    end if
     Open exepath + "\conf\" + locale + "\help.ini" For input As #f
     Do Until EOF(f)
         Line Input #f, dummy
@@ -345,11 +402,10 @@ Function readuilabel(filename as string) as boolean
     return true
 end function
 
-' display ui lable with unicode automatic spacing
-function getuilabelvalue(needle as string, suffix as string = "") as boolean
+' display ui lable with unicode and semi automatic spacing via offset
+function getuilabelvalue(needle as string, suffix as string = "", offset as integer = 20) as boolean
     dim fieldname  as string = ""
     dim fieldvalue as string = ""
-    dim fieldlen   as integer = 0 
 
     for i as integer = 0 to recnr
         with record
@@ -357,21 +413,16 @@ function getuilabelvalue(needle as string, suffix as string = "") as boolean
                 fieldname  = record.fieldname(i)
                 fieldvalue = record.fieldvalue(i)
             end if
-            ' get longest string    
-            if len(record.fieldvalue(i)) > fieldlen then
-                fieldlen = len(record.fieldvalue(i))
-            end if
         end with
     next i
     if fieldname = "" or fieldvalue = "" then
         print needle + " not found or empty " + suffix
         return false
     else
-        print wstr(fieldvalue + space(fieldlen - len(fieldvalue) + 1) + suffix)
+        print wstr(fieldvalue + space(offset - Len(fieldvalue)) + suffix)
         return true
     end if
 end function
-
 
 ' text related functions
 ' ______________________________________________________________________________'
@@ -379,17 +430,15 @@ end function
 ' split or explode by delimiter return elements in array
 ' based on https://www.freebasic.net/forum/viewtopic.php?t=31691 code by grindstone
 Function explode(haystack As String = "", delimiter as string, ordinance() As String) As UInteger
-    Dim As String text = haystack  'remind explode as working copy
     Dim As UInteger b = 1, e = 1   'pointer to text, begin and end
     Dim As UInteger x              'counter
-    ReDim ordinance(0)             'reset array
 
     Do Until e = 0
       x += 1
-      ReDim Preserve ordinance(x)         'create new array element
-      e = InStr(e + 1, text, delimiter)   'set end pointer to next space
-      ordinance(x) = Mid(text, b, e - b)  'cut text between the pointers and write it to the array
-      b = e + 1                           'set begin pointer behind end pointer for the next word
+      ReDim Preserve ordinance(x)             'create new array element
+      e = InStr(e + 1, haystack, delimiter)   'set end pointer to next space
+      ordinance(x) = Mid(haystack, b, e - b)  'cut text between the pointers and write it to the array
+      b = e + 1                               'set begin pointer behind end pointer for the next word
     Loop
 
     Return x 'nr of elements returned

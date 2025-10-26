@@ -1,4 +1,4 @@
-## gamepad2mkb
+## gamepad2mkb [![Github All Releases](https://img.shields.io/github/downloads/thrive4/util.fb.gamepad2mkb/total.svg)]()
 basic mouse and keyboard emulator via gamepad\
 supports directx and xinput\
 a specific key can be used for timed actions example\
@@ -13,6 +13,13 @@ or specify a path via \conf\conf.ini
 [gamepad map]\
 ' location mke\
 paddefinition = conf\<filename>.mke
+
+## install
+open zip file and copy contents to preferd folder
+this application is **portable**.
+
+## configuration
+options via conf/conf.ini
 
 ## requirements
 sdl2 (32bit) v2.28.5.0\
@@ -101,4 +108,5 @@ gpmap.bt(SDL_CONTROLLER_BUTTON_DPAD_UP)         = "btdpup"\
 gpmap.bt(SDL_CONTROLLER_BUTTON_DPAD_DOWN)       = "btdpdown"\
 gpmap.bt(SDL_CONTROLLER_BUTTON_DPAD_LEFT)       = "btdpleft"\
 gpmap.bt(SDL_CONTROLLER_BUTTON_DPAD_RIGHT)      = "btdpright"
+
 
