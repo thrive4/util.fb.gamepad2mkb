@@ -1,12 +1,5 @@
-' simulate windows mouse and keyboard with windows os api
-' SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS 
-'0 disable joystick & gamecontroller input events when the application is in the background
-'1 enable joystick & gamecontroller input events when the application is in the background
-'default joystick (and gamecontroller) events are not enabled when the application is in the background.
-
 ' init gamepad
 Dim As SDL_GameController Ptr controller = NULL
-'dim runningamepad    as boolean = false
 dim buttondowntime   as long
 dim buttonuptime     as long
 dim runningamepademu as boolean = false
@@ -173,13 +166,14 @@ Dim cnt         As Integer
 
 ' init mouse
 type mouseinit
-    deadzone     as single = 128.0f
-    acceleratex  as single = 0.0f
-    acceleratey  as single = 0.0f
-    mouseacclx   as single = 0.0f
-    mouseaccly   as single = 0.0f
-    mouseaccrx   as single = 0.0f
-    mouseaccry   as single = 0.0f
+    deadzone     as single  = 128.0f
+    acceleratex  as single  = 0.0f
+    acceleratey  as single  = 0.0f
+    spritecursor as boolean = false
+    mouseacclx   as single  = 0.0f
+    mouseaccly   as single  = 0.0f
+    mouseaccrx   as single  = 0.0f
+    mouseaccry   as single  = 0.0f
     vpoint       as Point
 end type
 dim axis2mouse as mouseinit
@@ -225,6 +219,7 @@ type mapo
     deadzone            as single  = 0.05f
     acceleratex         as single  = 10.0f
     acceleratey         as single  = 10.0f 
+    spritecursor        as boolean = false 
     showbuttonpress     as boolean = false
 end type
 dim gpmap as mapo
@@ -329,6 +324,8 @@ function getgamepadini(inifile as string, byref gpmap as mapo, byref gpmapaxis2k
                             gpmap.acceleratex = csng(inival)
                         case "acceleratey"
                             gpmap.acceleratey = csng(inival)
+                        case "spritecursor"
+                            gpmap.spritecursor = cbool(inival)
                         case "lstick_left_2key"
                             gpmapaxis2key.axislab(1) = inival
                             gpmapaxis2key.axisval(1) = convertbutton(inival)
@@ -418,10 +415,22 @@ function getgamepadini(inifile as string, byref gpmap as mapo, byref gpmapaxis2k
     end if    
 end function
 
-' simulate mouse pointer movement or keyboard with stick left and right
+' simulate mouse pointer movement gamepad stick left and right
 sub axis(byref axis2mouse as mouseinit, byref axisx as single, byref axisy as single, stick as string)
-    dim curscreenw as integer, curscreenh as integer
-    ScreenInfo curscreenw, curscreenh
+    Dim As Long hWnd, curscreenw, curscreenh
+    Dim rect As RECT
+
+    hWnd = GetForegroundWindow()
+    If GetClientRect(hWnd, @rect) Then
+        curscreenw = rect.right - rect.left
+        curscreenh = rect.bottom - rect.top
+    Else
+        ' fallback to desktop if failed
+        curscreenw = GetSystemMetrics(SM_CXSCREEN)
+        curscreenh = GetSystemMetrics(SM_CYSCREEN)
+    End If
+    'Print "Client area width:  "; curscreenw
+    'Print "Client area height: "; curscreenh
 
     dim accelx as single ptr, accely as single ptr
     if stick = "left" then
@@ -433,7 +442,8 @@ sub axis(byref axis2mouse as mouseinit, byref axisx as single, byref axisy as si
     end if
     ' radial magnitude of stick input
     dim mag as single = sqr(axisx * axisx + axisy * axisy)
-
+    ' screensize factor
+    dim scf as long   = max(0.2, (1.1 - (curscreenh / curscreenw)))
     if mag > axis2mouse.deadzone then
         ' normalize input vector to preserve direction
         dim normX as single = axisx / mag
@@ -446,13 +456,12 @@ sub axis(byref axis2mouse as mouseinit, byref axisx as single, byref axisy as si
 
         *accelx = (abs(scaledX) ^ 2.2) * axis2mouse.acceleratex
         *accely = (abs(scaledY) ^ 2.2) * axis2mouse.acceleratey
-
         axis2mouse.vpoint.x += sgn(scaledX) * *accelx
         axis2mouse.vpoint.y += sgn(scaledY) * *accely
     else
         ' decrease acceleration
-        *accelx *= 0.3
-        *accely *= 0.3
+        *accelx *= 0.03 * scf
+        *accely *= 0.03 * scf
     end if
 
     if axis2mouse.vpoint.x < 0 then axis2mouse.vpoint.x = 0
@@ -460,7 +469,26 @@ sub axis(byref axis2mouse as mouseinit, byref axisx as single, byref axisy as si
     if axis2mouse.vpoint.x > curscreenw - 1 then axis2mouse.vpoint.x = curscreenw - 1
     if axis2mouse.vpoint.y > curscreenh - 1 then axis2mouse.vpoint.y = curscreenh - 1
 
-    SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y)
+    if axis2mouse.spritecursor then
+        ' send relative deltas
+        ' axisx, axisy are in [-1,1]
+        ' use accel for sensitivity
+        dim dx as long = CLng(axisx * min(5.5, *accelx))
+        dim dy as long = CLng(axisy * min(5.5, *accely))
+        if dx <> 0 or dy <> 0 then
+            dim mi(0) as INPUT_
+            mi(0).type           = INPUT_MOUSE
+            mi(0).mi.dx          = dx
+            mi(0).mi.dy          = dy
+            mi(0).mi.mouseData   = 0
+            mi(0).mi.time        = 0
+            mi(0).mi.dwExtraInfo = 0
+            mi(0).mi.dwFlags     = MOUSEEVENTF_MOVE
+            SendInput(1, @mi(0), sizeof(INPUT_))
+        end if
+    else
+        SetCursorPos(axis2mouse.vpoint.x, axis2mouse.vpoint.y)
+    end if
 end sub
 
 function axis2key(axisanddir as integer, ax as single, byref gpmapaxis2key as mapaxis2key) as single
@@ -482,22 +510,49 @@ function axis2key(axisanddir as integer, ax as single, byref gpmapaxis2key as ma
 end function
 
 function mouseclick(byref axis2mouse as mouseinit, button as string, press as boolean) as boolean
-
-    select case button
-        case "mouse left"
-            if press then
-                mouse_event(MOUSEEVENTF_LEFTDOWN, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
-            else
-                mouse_event(MOUSEEVENTF_LEFTUP, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
-            end if
-        case "mouse right"
-            if press then
-                mouse_event(MOUSEEVENTF_RIGHTDOWN, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
-            else
-                mouse_event(MOUSEEVENTF_RIGHTUP, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
-            end if
-    end select
-
+    if axis2mouse.spritecursor then
+        dim mi(0) as INPUT_
+        mi(0).type           = INPUT_MOUSE
+        mi(0).mi.dx          = 0
+        mi(0).mi.dy          = 0
+        mi(0).mi.mouseData   = 0
+        mi(0).mi.time        = 0
+        mi(0).mi.dwExtraInfo = 0
+        select case button
+            case "mouse left"
+                if press then
+                    mi(0).mi.dwFlags = MOUSEEVENTF_LEFTDOWN
+                else
+                    mi(0).mi.dwFlags = MOUSEEVENTF_LEFTUP
+                end if
+            case "mouse right"
+                if press then
+                    mi(0).mi.dwFlags = MOUSEEVENTF_RIGHTDOWN
+                else
+                    mi(0).mi.dwFlags = MOUSEEVENTF_RIGHTUP
+                end if
+            ' optional: middle, X1, X2, wheel
+        end select
+        if mi(0).mi.dwFlags <> 0 then
+            SendInput(1, @mi(0), sizeof(INPUT_))
+        end if
+    else
+        select case button
+            case "mouse left"
+                if press then
+                    mouse_event(MOUSEEVENTF_LEFTDOWN, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
+                else
+                    mouse_event(MOUSEEVENTF_LEFTUP, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
+                end if
+            case "mouse right"
+                if press then
+                    mouse_event(MOUSEEVENTF_RIGHTDOWN, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
+                else
+                    mouse_event(MOUSEEVENTF_RIGHTUP, axis2mouse.vpoint.x, axis2mouse.vpoint.y, 0, 0)
+                end if
+        end select
+    end if
     return true    
 
 end function
+

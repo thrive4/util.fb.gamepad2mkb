@@ -1,3 +1,17 @@
+update v1.4 29/12/2025
+- added alternative mousemove and click
+  movement via sendinput used predominantly
+  for older games that use sprite cursors
+  devs nobilis, kheops and broken sword 5
+- updated to map version 1.1 added option
+  spritecursor true or false
+- fixed issue in axis sub to get correct
+  screen size of active window
+- added screensize factor to acceleration
+  math for mouse pointer
+- corrected helpfiles
+- harmonized help files and added switches
+
 update v1.3 16/10/2025
 - refactored gamepad axis to mouse handling
   implemented radial deadzone and acceleration

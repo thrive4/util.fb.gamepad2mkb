@@ -55,27 +55,6 @@ dim screenheight        As integer  = 280
 dim shared curscreenw   as integer
 dim shared curscreenh   as integer
 
-' load gamepad
-controller = SDL_GameControllerOpen(0)
-If (controller = NULL) Then
-    logentry("warning", "unable to open gamepad - sdl error: " & *SDL_GetError())
-else
-    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1")
-    ' SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS
-    '0 disable joystick & gamecontroller input events when the application is in the background
-    '1 enable joystick & gamecontroller input events when the application is in the background
-    'default joystick (and gamecontroller) events are not enabled when the application is in the background.
-    logentry("notice", "gamepad detected " & *SDL_GameControllerName(controller))
-end if
-
-' possible fix for unrecognized gamepad https://github.com/gabomdq/SDL_GameControllerDB
-'SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt")
-'Dim As ZString Ptr map = SDL_GameControllerMapping(controller)
-' for debug
-'Print *SDL_GameControllerName(controller)
-'print *map
-'sleep 3000
-
 function lerp(lstart as single, lend as single, lstep as single) as single
     return (1.0f - lstep) * lstart + lstep * lend
 end function
@@ -126,8 +105,11 @@ end select
 
 ' parse commandline for options overides conf.ini settings
 select case command(1)
-    case "/?", "-man"
+    case "/?", "-h", "-help", "--help", "-man"
         displayhelp(locale)
+        logentry("terminate", "normal termination " + appname)
+    case "-v", "-ver"
+        print appname + " version " & exeversion
         logentry("terminate", "normal termination " + appname)
 end select
 
@@ -160,12 +142,11 @@ print imagefolder
 getgamepadini(imagefolder, gpmap, gpmapaxis2key)
 
 ' todo make more consistent
-axis2mouse.deadzone    = gpmap.deadzone * 0.002f
-axis2mouse.acceleratex = gpmap.acceleratex
-axis2mouse.acceleratey = gpmap.acceleratey
-dim ax2mdzk as single  = axis2mouse.deadzone * 4.5f
-'print "using map: " + space(len("current gamepad") - 9) + paddefinition
-'print "deadzone:  " + space(len("current gamepad") - 9) & axis2mouse.deadzone
+axis2mouse.deadzone     = gpmap.deadzone * 0.002f
+axis2mouse.acceleratex  = gpmap.acceleratex
+axis2mouse.acceleratey  = gpmap.acceleratey
+axis2mouse.spritecursor = gpmap.spritecursor
+dim ax2mdzk as single   = axis2mouse.deadzone * 4.5f
 readuilabel(exepath + "\conf\" + locale + "\menu.ini")
 getuilabelvalue("using map", paddefinition)
 getuilabelvalue("deadzone" , str(axis2mouse.deadzone))
@@ -331,6 +312,7 @@ while runningmain
     wend
 
     ' use sdl_delay to keep cpu usage low needs low value with gamepads < 20 ms
+    ' influences axis acceleration to a large degree
     SDL_Delay(10)
 
 wend
