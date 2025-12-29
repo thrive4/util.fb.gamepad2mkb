@@ -5,10 +5,10 @@ settimeron          = btback
 ' set deadzone gamepad [0 - 256] default 128
 deadzone            = 64
 acceleratex         = 11
-acceleratey         = 7
+acceleratey         = 9
 ' set to true alternative method of moving mousepointer and mouseclick
 ' use for some older games by nobilis, kheops, etc default false
-spritecursor        = false
+spritecursor        = true
 
 [joystick01]
 lstick_left_2key    =

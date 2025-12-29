@@ -1,11 +1,14 @@
 [general]
-mapversion          = 1.0
+mapversion          = 1.1
 settimerduration    = 2.5
 settimeron          = btback
 ' set deadzone gamepad [0 - 256] default 128
 deadzone            = 64
-acceleratex         = 14.5
-acceleratey         = 12.5
+acceleratex         = 11.5
+acceleratey         = 9.5
+' set to true alternative method of moving mousepointer
+' use for some older games by nobilis, kheops, etc default false
+spritecursor        = false
 
 [joystick01]
 lstick_left_2key    = key a
